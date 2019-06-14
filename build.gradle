@@ -13,6 +13,7 @@ repositories {
 dependencies {
     compile group: 'org.apache.poi', name: 'poi', version: '4.1.0'
     compile group: 'org.apache.poi', name: 'poi-ooxml', version: '4.1.0'
+    compile group: 'com.squareup.okhttp3', name: 'okhttp', version: '3.14.2'
     compile group: 'org.json', name: 'json', version: '20180813'
     compile group: 'org.jsoup', name: 'jsoup', version: '1.12.1'
 }
