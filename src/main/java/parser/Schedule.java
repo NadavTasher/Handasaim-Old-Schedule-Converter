@@ -10,6 +10,7 @@ import okhttp3.*;
 import org.apache.poi.hssf.usermodel.*;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Shape;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.*;
@@ -60,7 +61,10 @@ public class Schedule extends JSONObject {
     private ArrayList<String> initializeMessages(Sheet sheet) {
         ArrayList<String> messages = new ArrayList<>();
         try {
+            // Check type of sheet
+//            ArrayList<Shape>
             if (sheet.getWorkbook() instanceof HSSFWorkbook) {
+                sheet.createDrawingPatriarch();
                 HSSFPatriarch patriarch = (HSSFPatriarch) sheet.createDrawingPatriarch();
                 List<HSSFShape> shapes = patriarch.getChildren();
                 for (int s = 0; s < shapes.size(); s++) {
