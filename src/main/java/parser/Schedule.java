@@ -241,6 +241,7 @@ public class Schedule extends JSONObject {
             // Put grade in grades
             grades.put(name, grade);
         }
+        return grades;
     }
 
     private int parseGrade(String name) {
