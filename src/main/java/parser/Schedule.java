@@ -6,13 +6,12 @@
 
 package parser;
 
+import appcore.components.Classroom;
+import appcore.components.Subject;
 import okhttp3.*;
 import org.apache.poi.hssf.usermodel.*;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Shape;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -21,26 +20,48 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
 public class Schedule extends JSONObject {
 
-    private Sheet sheet = null;
+    private static String[] DAYS = {
+            "ראשון",
+            "שני",
+            "שלישי",
+            "רביעי",
+            "חמישי",
+            "שישי",
+            "שבת"
+    };
+
+    private static String[][] TRIMMERS = {
+            {", ", " · "},
+            {",", " · "},
+            {"מתמטיקה", "מתמט'"},
+            {"טכניונית", "טכ'"},
+            {"", ""},
+    };
+
 
     public Schedule(String page) {
         // Add ringing times
         put("schedule", new int[]{465, 510, 555, 615, 660, 730, 775, 830, 875, 930, 975, 1020, 1065});
         // Initialize sheet
-        sheet = initializeSheet(page);
+        Sheet sheet = initializeSheet(page);
         // Initialize messages
-        put("messages", initializeMessages());
+        put("messages", parseMessages(sheet));
+        // Initialize day
+        put("day", parseDay(sheet));
+        // Initialize grades
+        put("grades", parseGrades(sheet));
+        // Initialize teachers
+        put("teachers", parseTeachers(get("grades")));
+
     }
 
     public String export() {
@@ -58,48 +79,28 @@ public class Schedule extends JSONObject {
         put("errors", errors);
     }
 
-    private ArrayList<String> initializeMessages(Sheet sheet) {
+    private ArrayList<String> parseMessages(Sheet sheet) {
         ArrayList<String> messages = new ArrayList<>();
         try {
             // Check type of sheet
-//            ArrayList<Shape>
             if (sheet.getWorkbook() instanceof HSSFWorkbook) {
-                sheet.createDrawingPatriarch();
-                HSSFPatriarch patriarch = (HSSFPatriarch) sheet.createDrawingPatriarch();
-                List<HSSFShape> shapes = patriarch.getChildren();
-                for (int s = 0; s < shapes.size(); s++) {
-                    if (shapes.get(s) instanceof HSSFTextbox) {
-                        try {
-                            HSSFShape mShape = shapes.get(s);
-                            if (mShape != null) {
-                                HSSFTextbox mTextShape = (HSSFTextbox) mShape;
-                                HSSFRichTextString mString = mTextShape.getString();
-                                if (mString != null) {
-                                    messages.add(mString.getString());
-                                }
-                            }
-                        } catch (NullPointerException ignored) {
-                        }
+                // Get messages list
+                List<HSSFShape> shapes = ((HSSFSheet) sheet).createDrawingPatriarch().getChildren();
+                // Loop through shapes
+                for (HSSFShape shape : shapes) {
+                    if (shape instanceof HSSFTextbox) {
+                        // Add to list
+                        messages.add(((HSSFTextbox) shape).getString().getString());
                     }
                 }
             } else {
-                XSSFSheet convertedSheet = (XSSFSheet) sheet;
-                XSSFDrawing drawing = convertedSheet.createDrawingPatriarch();
-                List<XSSFShape> shapes = drawing.getShapes();
-                for (int s = 0; s < shapes.size(); s++) {
-                    if (shapes.get(s) instanceof XSSFSimpleShape) {
-                        try {
-                            XSSFSimpleShape mShape = (XSSFSimpleShape) shapes.get(s);
-                            if (mShape != null) {
-                                if (mShape.getText() != null) {
-                                    String mString = mShape.getText();
-                                    if (mString != null) {
-                                        messages.add(mString);
-                                    }
-                                }
-                            }
-                        } catch (NullPointerException ignored) {
-                        }
+                // Get messages list
+                List<XSSFShape> shapes = ((XSSFSheet) sheet).createDrawingPatriarch().getShapes();
+                // Loop through shapes
+                for (XSSFShape shape : shapes) {
+                    if (shape instanceof XSSFSimpleShape) {
+                        // Add to list
+                        messages.add(((XSSFSimpleShape) shape).getText());
                     }
                 }
             }
@@ -174,8 +175,7 @@ public class Schedule extends JSONObject {
                 // Pull 'href' attribute from 'a' tag
                 String href = element.attr("href");
                 // Check 'href' attribute file format against known excel file types, and verify that it is indeed a schedule Excel (other Excel files might exist on the homepage.).
-                if ((href.endsWith(".xls") || href.endsWith(".xlsx") && Pattern.compile("^(.(|.)-.(|.)\\..+)$").matcher(href).find())
-                {
+                if ((href.endsWith(".xls") || href.endsWith(".xlsx") && Pattern.compile("^(.(|.)-.(|.)\\..+)$").matcher(href).find())) {
                     // Return 'href' attribute
                     return href;
                 }
@@ -185,110 +185,97 @@ public class Schedule extends JSONObject {
         return null;
     }
 
-    private static int getReadingRow(Sheet sheet) {
-        Cell secondCell = sheet.getRow(0).getCell(1);
-        if (!readCell(secondCell).isEmpty()) {
-            return 0;
-        } else {
-            return 1;
+    private String subject(String untrimmed) {
+        // Loop through replacements to shorten names
+        for (String[] replacement : TRIMMERS) {
+            if (replacement.length == 2)
+                untrimmed = untrimmed.replaceAll(replacement[0], replacement[1]);
         }
+        return untrimmed;
     }
 
-    private static int getReadingColumn(Sheet sheet) {
-        return 1;
-    }
-
-    private void parseMessages(appcore.components.Schedule.Builder builder, Sheet sheet) {
-        try {
-            if (sheet.getWorkbook() instanceof HSSFWorkbook) {
-                HSSFPatriarch patriarch = (HSSFPatriarch) sheet.createDrawingPatriarch();
-                List<HSSFShape> shapes = patriarch.getChildren();
-                for (int s = 0; s < shapes.size(); s++) {
-                    if (shapes.get(s) instanceof HSSFTextbox) {
-                        try {
-                            HSSFShape mShape = shapes.get(s);
-                            if (mShape != null) {
-                                HSSFTextbox mTextShape = (HSSFTextbox) mShape;
-                                HSSFRichTextString mString = mTextShape.getString();
-                                if (mString != null) {
-                                    builder.addMessage(mString.getString());
-                                }
-                            }
-                        } catch (NullPointerException ignored) {
-                        }
+    private JSONObject parseGrades(Sheet sheet) {
+        JSONObject grades = new JSONObject();
+        // If the cell after day name is empty, first row is 1, else 0
+        int firstRow = parseCell(sheet, 1, 0).isEmpty() ? 1 : 0;
+        // First column is always after the hour column
+        int firstColumn = 1;
+        int lastRow = sheet.getLastRowNum();
+        int lastColumn = sheet.getRow(firstRow).getLastCellNum();
+        // Loop through columns
+        for (int c = firstColumn; c < lastColumn; c++) {
+            // Create grade structure
+            JSONObject grade = new JSONObject();
+            // Parse minimal grade name
+            String name = parseCell(sheet, c, firstRow).split(" ")[0];
+            // Put parsed grade number (7-12)
+            grade.put("grade", parseGrade(name));
+            // Create subjects structure
+            JSONObject subjects = new JSONObject();
+            // Loop through rows, first row is the one after the title
+            for (int r = firstRow + 1; r < lastRow; r++) {
+                // Get cell value
+                String text = parseCell(sheet, c, r);
+                // Check if cell is not empty
+                if (!text.isEmpty()) {
+                    // Create subject and teachers structure
+                    JSONObject subject = new JSONObject();
+                    JSONArray teachers = new JSONArray();
+                    // Split cell to rows
+                    String[] rows = text.split("(|\r)(\n)");
+                    // Put trimmed subject name in subject
+                    subject.put("name", subject(rows[0]));
+                    // Check if cell has more then one row
+                    if (rows.length > 1) {
+                        // Loop through last row divided by commas and add to teachers
+                        for (String teacher : rows[rows.length - 1].split(",")) teachers.put(teacher);
                     }
-                }
-            } else {
-                XSSFSheet convertedSheet = (XSSFSheet) sheet;
-                XSSFDrawing drawing = convertedSheet.createDrawingPatriarch();
-                List<XSSFShape> shapes = drawing.getShapes();
-                for (int s = 0; s < shapes.size(); s++) {
-                    if (shapes.get(s) instanceof XSSFSimpleShape) {
-                        try {
-                            XSSFSimpleShape mShape = (XSSFSimpleShape) shapes.get(s);
-                            if (mShape != null) {
-                                if (mShape.getText() != null) {
-                                    String mString = mShape.getText();
-                                    if (mString != null) {
-                                        builder.addMessage(mString);
-                                    }
-                                }
-                            }
-                        } catch (NullPointerException ignored) {
-                        }
-                    }
+                    // Put teachers in subject
+                    subject.put("teachers", teachers);
+                    // Put subject in subjects as hour number (0-13+), for easy scanning
+                    subjects.put(String.valueOf(r - (firstRow + 1)), subject);
                 }
             }
-        } catch (Exception e) {
-            builder.addMessage("Failed: Reading Messages");
+            // Put subjects in grade
+            grade.put("subjects", subjects);
+            // Put grade in grades
+            grades.put(name, grade);
         }
     }
 
-    private static Sheet getSheet(File f) {
-        try {
-            if (f.toString().endsWith(".xls")) {
-                POIFSFileSystem fileSystem = new POIFSFileSystem(new FileInputStream(f));
-                Workbook workBook = new HSSFWorkbook(fileSystem);
-                Sheet foundSheet = null;
-                for (int s = 0; s < workBook.getNumberOfSheets() && foundSheet == null; s++) {
-                    Sheet current = workBook.getSheetAt(s);
-                    if (current.getLastRowNum() - 1 > 0) {
-                        foundSheet = current;
-                    }
-                }
-                return foundSheet;
-            } else {
-                XSSFWorkbook workBook = new XSSFWorkbook(new FileInputStream(f));
-                Sheet foundSheet = null;
-                for (int s = 0; s < workBook.getNumberOfSheets() && foundSheet == null; s++) {
-                    Sheet current = workBook.getSheetAt(s);
-                    if (current.getLastRowNum() - 1 > 0) {
-                        foundSheet = current;
-                    }
-                }
-                return foundSheet;
-            }
-        } catch (IOException ignored) {
-            return null;
-        }
+    private int parseGrade(String name) {
+        // Parse grade from name
+        if (name.startsWith("ז")) return 7;
+        if (name.startsWith("ח")) return 8;
+        if (name.startsWith("ט")) return 9;
+        if (name.startsWith("יב")) return 12;
+        if (name.startsWith("יא")) return 11;
+        if (name.startsWith("י")) return 10;
     }
 
-    private static String readCell(Cell cell) {
+    private String parseCell(Sheet sheet, int x, int y) {
+        return parseCell(sheet.getRow(y).getCell(x));
+    }
+
+    private String parseCell(Cell cell) {
         if (cell != null) {
-            try {
-                switch (cell.getCellType()) {
-                    case STRING:
-                        return cell.getStringCellValue();
-                    case NUMERIC:
-                        return String.valueOf((int) cell.getNumericCellValue());
-                    case BOOLEAN:
-                        return String.valueOf(cell.getBooleanCellValue());
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+            switch (cell.getCellType()) {
+                case STRING:
+                    return cell.getStringCellValue();
+                case NUMERIC:
+                    return String.valueOf((int) cell.getNumericCellValue());
             }
         }
         return "";
     }
 
+    private int parseDay(Sheet sheet) {
+        // Get cell value
+        String day = parseCell(sheet, 0, 0);
+        // Loop through days and compare until match found and return the number of the day (1-7, on error 0)
+        for (int d = 0; d < DAYS.length; d++) {
+            if (DAYS[d].equals(day)) return d + 1;
+        }
+        return 0;
+    }
 }
