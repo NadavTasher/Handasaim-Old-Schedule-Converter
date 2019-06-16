@@ -60,7 +60,7 @@ public class Schedule extends JSONObject {
         // Initialize grades
         put("grades", parseGrades(sheet));
         // Initialize teachers
-        put("teachers", parseTeachers(get("grades")));
+//        put("teachers", parseTeachers(get("grades")));
 
     }
 
@@ -79,8 +79,8 @@ public class Schedule extends JSONObject {
         put("errors", errors);
     }
 
-    private ArrayList<String> parseMessages(Sheet sheet) {
-        ArrayList<String> messages = new ArrayList<>();
+    private JSONArray parseMessages(Sheet sheet) {
+        JSONArray messages = new JSONArray();
         try {
             // Check type of sheet
             if (sheet.getWorkbook() instanceof HSSFWorkbook) {
@@ -90,7 +90,7 @@ public class Schedule extends JSONObject {
                 for (HSSFShape shape : shapes) {
                     if (shape instanceof HSSFTextbox) {
                         // Add to list
-                        messages.add(((HSSFTextbox) shape).getString().getString());
+                        messages.put(((HSSFTextbox) shape).getString().getString());
                     }
                 }
             } else {
@@ -100,7 +100,7 @@ public class Schedule extends JSONObject {
                 for (XSSFShape shape : shapes) {
                     if (shape instanceof XSSFSimpleShape) {
                         // Add to list
-                        messages.add(((XSSFSimpleShape) shape).getText());
+                        messages.put(((XSSFSimpleShape) shape).getText());
                     }
                 }
             }
