@@ -251,6 +251,7 @@ public class Schedule extends JSONObject {
         if (name.startsWith("יב")) return 12;
         if (name.startsWith("יא")) return 11;
         if (name.startsWith("י")) return 10;
+        return 0;
     }
 
     private String parseCell(Sheet sheet, int x, int y) {
