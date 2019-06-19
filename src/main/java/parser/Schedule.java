@@ -235,7 +235,7 @@ public class Schedule extends JSONObject {
                     // Check if cell has more then one row
                     if (rows.length > 1) {
                         // Loop through last row divided by commas and add to teachers
-                        for (String teacher : rows[rows.length - 1].split(", ")) teachers.put(teacher);
+                        for (String teacher : rows[rows.length - 1].split("(|\\s),(|\\s)")) teachers.put(teacher);
                     }
                     // Put teachers in parseSubject
                     subject.put(TEACHERS, teachers);
