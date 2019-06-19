@@ -6,9 +6,6 @@
 
 package parser;
 
-import appcore.components.Classroom;
-import appcore.components.Subject;
-import appcore.components.Teacher;
 import okhttp3.*;
 import org.apache.poi.hssf.usermodel.*;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
@@ -22,8 +19,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -58,7 +53,6 @@ public class Schedule extends JSONObject {
             {"מעבדה", "מע'"}
     };
 
-
     public Schedule(String page) {
         // Add ringing times
         put(SCHEDULE, new int[]{465, 510, 555, 615, 660, 730, 775, 830, 875, 930, 975, 1020, 1065});
@@ -75,11 +69,7 @@ public class Schedule extends JSONObject {
 
     }
 
-    public String export() {
-        return toString();
-    }
-
-    private void addError(String error) {
+    private void error(String error) {
         // Read array from structure
         JSONArray errors = optJSONArray(ERRORS);
         // Initialize if null
@@ -90,91 +80,25 @@ public class Schedule extends JSONObject {
         put(ERRORS, errors);
     }
 
-    private JSONArray parseMessages(Sheet sheet) {
-        JSONArray messages = new JSONArray();
-        try {
-            // Check type of sheet
-            if (sheet.getWorkbook() instanceof HSSFWorkbook) {
-                // Get messages list
-                List<HSSFShape> shapes = ((HSSFSheet) sheet).createDrawingPatriarch().getChildren();
-                // Loop through shapes
-                for (HSSFShape shape : shapes) {
-                    if (shape instanceof HSSFTextbox) {
-                        // Add to list
-                        messages.put(((HSSFTextbox) shape).getString().getString());
-                    }
-                }
-            } else {
-                // Get messages list
-                List<XSSFShape> shapes = ((XSSFSheet) sheet).createDrawingPatriarch().getShapes();
-                // Loop through shapes
-                for (XSSFShape shape : shapes) {
-                    if (shape instanceof XSSFSimpleShape) {
-                        // Add to list
-                        messages.put(((XSSFSimpleShape) shape).getText());
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            addError("Failed reading messages");
-        }
-        return messages;
+    private int parseGrade(String name) {
+        // Parse grade from name
+        if (name.startsWith("ז")) return 7;
+        if (name.startsWith("ח")) return 8;
+        if (name.startsWith("ט")) return 9;
+        if (name.startsWith("יב")) return 12;
+        if (name.startsWith("יא")) return 11;
+        if (name.startsWith("י")) return 10;
+        return 0;
     }
 
-    private JSONArray parseTeachers(JSONObject grades) {
-        // Initialize teachers array
-        JSONArray teachers = new JSONArray();
-        // Loop through grades
-        for (String grade : grades.keySet()) {
-            // Loop through subjects
-            for (String hour : grades.getJSONObject(grade).getJSONObject(SUBJECTS).keySet()) {
-                // Loop through teacher name array in subject
-                for (Object name : grades.getJSONObject(grade).getJSONObject(SUBJECTS).getJSONObject(hour).getJSONArray(TEACHERS)) {
-                    // Check type of object
-                    if (name instanceof String) {
-                        // Initialize flag
-                        boolean found = false;
-                        // Loop through teachers array
-                        for (Object teacher : teachers) {
-                            // Check type of object
-                            if (teacher instanceof JSONObject) {
-                                // Check if array name starts with teacher name of vice versa (e.g. John J and John or John and John J will match, but John J and John D won't)
-                                if (((String) name).startsWith(((JSONObject) teacher).getString(NAME)) || ((JSONObject) teacher).getString(NAME).startsWith(((String) name))) {
-                                    // Pull subjects object from teacher
-                                    JSONObject subjects = ((JSONObject) teacher).getJSONObject(SUBJECTS);
-                                    // Insert subject
-                                    subjects.put(hour, grade);
-                                    // Check if subject's teacher name is longer, and replace.
-                                    if (((String) name).length() > ((JSONObject) teacher).getString(NAME).length()) {
-                                        // Replace teacher name
-                                        ((JSONObject) teacher).put(NAME, name);
-                                    }
-                                    // Put subjects object in teacher
-                                    ((JSONObject) teacher).put(SUBJECTS, subjects);
-                                    // Change flag
-                                    found = true;
-                                }
-                            }
-                        }
-                        // Check flag
-                        if (!found) {
-                            // Create new teacher object and subjects object
-                            JSONObject teacher = new JSONObject();
-                            JSONObject subjects = new JSONObject();
-                            // Insert subject
-                            subjects.put(hour, grade);
-                            // Put name
-                            teacher.put(NAME, name);
-                            // Put subjects object in teacher
-                            teacher.put(SUBJECTS, subjects);
-                            // Put teacher in teachers array
-                            teachers.put(teacher);
-                        }
-                    }
-                }
-            }
+    private int parseDay(Sheet sheet) {
+        // Get cell value
+        String day = parseCell(sheet, 0, 0);
+        // Loop through days and compare until match found and return the number of the day (1-7, on error 0)
+        for (int d = 0; d < DAYS.length; d++) {
+            if (DAYS[d].equals(day)) return d + 1;
         }
-        return teachers;
+        return 0;
     }
 
     private Sheet initializeSheet(String page) {
@@ -219,13 +143,13 @@ public class Schedule extends JSONObject {
                         }
                     }
                 } else {
-                    addError("Null Excel response body");
+                    error("Null Excel response body");
                 }
             } catch (Exception ignored) {
             }
             return null;
         } else {
-            addError("Schedule link not found");
+            error("Schedule link not found");
         }
         return null;
     }
@@ -252,7 +176,23 @@ public class Schedule extends JSONObject {
         return null;
     }
 
-    private String subject(String untrimmed) {
+    private String parseCell(Sheet sheet, int x, int y) {
+        return parseCell(sheet.getRow(y).getCell(x));
+    }
+
+    private String parseCell(Cell cell) {
+        if (cell != null) {
+            switch (cell.getCellType()) {
+                case STRING:
+                    return cell.getStringCellValue();
+                case NUMERIC:
+                    return String.valueOf((int) cell.getNumericCellValue());
+            }
+        }
+        return "";
+    }
+
+    private String parseSubject(String untrimmed) {
         // Loop through replacements to shorten names
         for (String[] replacement : TRIMMERS) {
             if (replacement.length == 2)
@@ -285,21 +225,21 @@ public class Schedule extends JSONObject {
                 String text = parseCell(sheet, c, r);
                 // Check if cell is not empty
                 if (!text.isEmpty()) {
-                    // Create subject and teachers structure
+                    // Create parseSubject and teachers structure
                     JSONObject subject = new JSONObject();
                     JSONArray teachers = new JSONArray();
                     // Split cell to rows
                     String[] rows = text.split("(|\r)(\n)");
-                    // Put trimmed subject name in subject
-                    subject.put(NAME, subject(rows[0]));
+                    // Put trimmed parseSubject name in parseSubject
+                    subject.put(NAME, parseSubject(rows[0]));
                     // Check if cell has more then one row
                     if (rows.length > 1) {
                         // Loop through last row divided by commas and add to teachers
                         for (String teacher : rows[rows.length - 1].split(", ")) teachers.put(teacher);
                     }
-                    // Put teachers in subject
+                    // Put teachers in parseSubject
                     subject.put(TEACHERS, teachers);
-                    // Put subject in subjects as hour number (0-13+), for easy scanning
+                    // Put parseSubject in subjects as hour number (0-13+), for easy scanning
                     subjects.put(String.valueOf(r - (firstRow + 1)), subject);
                 }
             }
@@ -311,40 +251,90 @@ public class Schedule extends JSONObject {
         return grades;
     }
 
-    private int parseGrade(String name) {
-        // Parse grade from name
-        if (name.startsWith("ז")) return 7;
-        if (name.startsWith("ח")) return 8;
-        if (name.startsWith("ט")) return 9;
-        if (name.startsWith("יב")) return 12;
-        if (name.startsWith("יא")) return 11;
-        if (name.startsWith("י")) return 10;
-        return 0;
+    private JSONArray parseMessages(Sheet sheet) {
+        JSONArray messages = new JSONArray();
+        try {
+            // Check type of sheet
+            if (sheet.getWorkbook() instanceof HSSFWorkbook) {
+                // Get messages list
+                List<HSSFShape> shapes = ((HSSFSheet) sheet).createDrawingPatriarch().getChildren();
+                // Loop through shapes
+                for (HSSFShape shape : shapes) {
+                    if (shape instanceof HSSFTextbox) {
+                        // Add to list
+                        messages.put(((HSSFTextbox) shape).getString().getString());
+                    }
+                }
+            } else {
+                // Get messages list
+                List<XSSFShape> shapes = ((XSSFSheet) sheet).createDrawingPatriarch().getShapes();
+                // Loop through shapes
+                for (XSSFShape shape : shapes) {
+                    if (shape instanceof XSSFSimpleShape) {
+                        // Add to list
+                        messages.put(((XSSFSimpleShape) shape).getText());
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            error("Failed reading messages");
+        }
+        return messages;
     }
 
-    private String parseCell(Sheet sheet, int x, int y) {
-        return parseCell(sheet.getRow(y).getCell(x));
-    }
-
-    private String parseCell(Cell cell) {
-        if (cell != null) {
-            switch (cell.getCellType()) {
-                case STRING:
-                    return cell.getStringCellValue();
-                case NUMERIC:
-                    return String.valueOf((int) cell.getNumericCellValue());
+    private JSONArray parseTeachers(JSONObject grades) {
+        // Initialize teachers array
+        JSONArray teachers = new JSONArray();
+        // Loop through grades
+        for (String grade : grades.keySet()) {
+            // Loop through subjects
+            for (String hour : grades.getJSONObject(grade).getJSONObject(SUBJECTS).keySet()) {
+                // Loop through teacher name array in parseSubject
+                for (Object name : grades.getJSONObject(grade).getJSONObject(SUBJECTS).getJSONObject(hour).getJSONArray(TEACHERS)) {
+                    // Check type of object
+                    if (name instanceof String) {
+                        // Initialize flag
+                        boolean found = false;
+                        // Loop through teachers array
+                        for (Object teacher : teachers) {
+                            // Check type of object
+                            if (teacher instanceof JSONObject) {
+                                // Check if array name starts with teacher name of vice versa (e.g. John J and John or John and John J will match, but John J and John D won't)
+                                if (((String) name).startsWith(((JSONObject) teacher).getString(NAME)) || ((JSONObject) teacher).getString(NAME).startsWith(((String) name))) {
+                                    // Pull subjects object from teacher
+                                    JSONObject subjects = ((JSONObject) teacher).getJSONObject(SUBJECTS);
+                                    // Insert parseSubject
+                                    subjects.put(hour, grade);
+                                    // Check if parseSubject's teacher name is longer, and replace.
+                                    if (((String) name).length() > ((JSONObject) teacher).getString(NAME).length()) {
+                                        // Replace teacher name
+                                        ((JSONObject) teacher).put(NAME, name);
+                                    }
+                                    // Put subjects object in teacher
+                                    ((JSONObject) teacher).put(SUBJECTS, subjects);
+                                    // Change flag
+                                    found = true;
+                                }
+                            }
+                        }
+                        // Check flag
+                        if (!found) {
+                            // Create new teacher object and subjects object
+                            JSONObject teacher = new JSONObject();
+                            JSONObject subjects = new JSONObject();
+                            // Insert parseSubject
+                            subjects.put(hour, grade);
+                            // Put name
+                            teacher.put(NAME, name);
+                            // Put subjects object in teacher
+                            teacher.put(SUBJECTS, subjects);
+                            // Put teacher in teachers array
+                            teachers.put(teacher);
+                        }
+                    }
+                }
             }
         }
-        return "";
-    }
-
-    private int parseDay(Sheet sheet) {
-        // Get cell value
-        String day = parseCell(sheet, 0, 0);
-        // Loop through days and compare until match found and return the number of the day (1-7, on error 0)
-        for (int d = 0; d < DAYS.length; d++) {
-            if (DAYS[d].equals(day)) return d + 1;
-        }
-        return 0;
+        return teachers;
     }
 }
