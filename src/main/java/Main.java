@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2019 Nadav Tasher
+ * https://github.com/NadavTasher/HandasaimScheduler
+ * https://github.com/NadavTasher/HandasaimWeb
+ */
+
 import org.json.JSONObject;
 import parser.Schedule;
 
