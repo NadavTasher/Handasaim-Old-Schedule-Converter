@@ -31,8 +31,14 @@ import java.util.regex.Pattern;
 public class Schedule extends JSONObject {
 
     private static String SUBJECTS = "subjects";
+    private static String MESSAGES = "messages";
     private static String TEACHERS = "teachers";
+    private static String SCHEDULE = "schedule";
+    private static String ERRORS = "errors";
+    private static String GRADES = "grades";
+    private static String GRADE = "grade";
     private static String NAME = "name";
+    private static String DAY = "day";
 
     private static String[] DAYS = {
             "ראשון",
@@ -55,17 +61,17 @@ public class Schedule extends JSONObject {
 
     public Schedule(String page) {
         // Add ringing times
-        put("schedule", new int[]{465, 510, 555, 615, 660, 730, 775, 830, 875, 930, 975, 1020, 1065});
+        put(SCHEDULE, new int[]{465, 510, 555, 615, 660, 730, 775, 830, 875, 930, 975, 1020, 1065});
         // Initialize sheet
         Sheet sheet = initializeSheet(page);
         // Initialize messages
-        put("messages", parseMessages(sheet));
+        put(MESSAGES, parseMessages(sheet));
         // Initialize day
-        put("day", parseDay(sheet));
+        put(DAY, parseDay(sheet));
         // Initialize grades
-        put("grades", parseGrades(sheet));
+        put(GRADES, parseGrades(sheet));
         // Initialize teachers
-        put("teachers", parseTeachers(getJSONObject("grades")));
+        put(TEACHERS, parseTeachers(getJSONObject(GRADES)));
 
     }
 
@@ -75,13 +81,13 @@ public class Schedule extends JSONObject {
 
     private void addError(String error) {
         // Read array from structure
-        JSONArray errors = optJSONArray("errors");
+        JSONArray errors = optJSONArray(ERRORS);
         // Initialize if null
         if (errors == null) errors = new JSONArray();
         // Push 'error' to array
         errors.put(error);
         // Write array to structure
-        put("errors", errors);
+        put(ERRORS, errors);
     }
 
     private JSONArray parseMessages(Sheet sheet) {
@@ -270,7 +276,7 @@ public class Schedule extends JSONObject {
             // Parse minimal grade name
             String name = parseCell(sheet, c, firstRow).split(" ")[0];
             // Put parsed grade number (7-12)
-            grade.put("grade", parseGrade(name));
+            grade.put(GRADE, parseGrade(name));
             // Create subjects structure
             JSONObject subjects = new JSONObject();
             // Loop through rows, first row is the one after the title
@@ -285,20 +291,20 @@ public class Schedule extends JSONObject {
                     // Split cell to rows
                     String[] rows = text.split("(|\r)(\n)");
                     // Put trimmed subject name in subject
-                    subject.put("name", subject(rows[0]));
+                    subject.put(NAME, subject(rows[0]));
                     // Check if cell has more then one row
                     if (rows.length > 1) {
                         // Loop through last row divided by commas and add to teachers
-                        for (String teacher : rows[rows.length - 1].split(",")) teachers.put(teacher);
+                        for (String teacher : rows[rows.length - 1].split(", ")) teachers.put(teacher);
                     }
                     // Put teachers in subject
-                    subject.put("teachers", teachers);
+                    subject.put(TEACHERS, teachers);
                     // Put subject in subjects as hour number (0-13+), for easy scanning
                     subjects.put(String.valueOf(r - (firstRow + 1)), subject);
                 }
             }
             // Put subjects in grade
-            grade.put("subjects", subjects);
+            grade.put(SUBJECTS, subjects);
             // Put grade in grades
             grades.put(name, grade);
         }
