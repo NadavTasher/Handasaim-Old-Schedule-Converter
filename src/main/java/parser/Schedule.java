@@ -8,6 +8,7 @@ package parser;
 
 import appcore.components.Classroom;
 import appcore.components.Subject;
+import appcore.components.Teacher;
 import okhttp3.*;
 import org.apache.poi.hssf.usermodel.*;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
@@ -28,6 +29,10 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class Schedule extends JSONObject {
+
+    private static String SUBJECTS = "subjects";
+    private static String TEACHERS = "teachers";
+    private static String NAME = "name";
 
     private static String[] DAYS = {
             "ראשון",
@@ -60,7 +65,7 @@ public class Schedule extends JSONObject {
         // Initialize grades
         put("grades", parseGrades(sheet));
         // Initialize teachers
-//        put("teachers", parseTeachers(get("grades")));
+        put("teachers", parseTeachers(getJSONObject("grades")));
 
     }
 
@@ -108,6 +113,62 @@ public class Schedule extends JSONObject {
             addError("Failed reading messages");
         }
         return messages;
+    }
+
+    private JSONArray parseTeachers(JSONObject grades) {
+        // Initialize teachers array
+        JSONArray teachers = new JSONArray();
+        // Loop through grades
+        for (String grade : grades.keySet()) {
+            // Loop through subjects
+            for (String hour : grades.getJSONObject(grade).getJSONObject(SUBJECTS).keySet()) {
+                // Loop through teacher name array in subject
+                for (Object name : grades.getJSONObject(grade).getJSONObject(SUBJECTS).getJSONObject(hour).getJSONArray(TEACHERS)) {
+                    // Check type of object
+                    if (name instanceof String) {
+                        // Initialize flag
+                        boolean found = false;
+                        // Loop through teachers array
+                        for (Object teacher : teachers) {
+                            // Check type of object
+                            if (teacher instanceof JSONObject) {
+                                // Check if array name starts with teacher name of vice versa (e.g. John J and John or John and John J will match, but John J and John D won't)
+                                if (((String) name).startsWith(((JSONObject) teacher).getString(NAME)) || ((JSONObject) teacher).getString(NAME).startsWith(((String) name))) {
+                                    // Pull subjects object from teacher
+                                    JSONObject subjects = ((JSONObject) teacher).getJSONObject(SUBJECTS);
+                                    // Insert subject
+                                    subjects.put(hour, grade);
+                                    // Check if subject's teacher name is longer, and replace.
+                                    if (((String) name).length() > ((JSONObject) teacher).getString(NAME).length()) {
+                                        // Replace teacher name
+                                        ((JSONObject) teacher).put(NAME, name);
+                                    }
+                                    // Put subjects object in teacher
+                                    ((JSONObject) teacher).put(SUBJECTS, subjects);
+                                    // Change flag
+                                    found = true;
+                                }
+                            }
+                        }
+                        // Check flag
+                        if (!found) {
+                            // Create new teacher object and subjects object
+                            JSONObject teacher = new JSONObject();
+                            JSONObject subjects = new JSONObject();
+                            // Insert subject
+                            subjects.put(hour, grade);
+                            // Put name
+                            teacher.put(NAME, name);
+                            // Put subjects object in teacher
+                            teacher.put(SUBJECTS, subjects);
+                            // Put teacher in teachers array
+                            teachers.put(teacher);
+                        }
+                    }
+                }
+            }
+        }
+        return teachers;
     }
 
     private Sheet initializeSheet(String page) {
