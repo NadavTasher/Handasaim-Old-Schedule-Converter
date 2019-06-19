@@ -1,9 +1,21 @@
+import org.json.JSONObject;
 import parser.Schedule;
 
+import java.io.File;
+import java.nio.file.Files;
+
 public class Main {
-
     public static void main(String[] arguments) {
-        System.out.println(new Schedule(arguments[0]).export());
+        String json = new JSONObject().toString();
+        if (arguments.length >= 1) {
+            json = new Schedule(arguments[0]).toString();
+        }
+        if (arguments.length >= 2) {
+            try {
+                Files.write(new File(arguments[1]).toPath(), json.getBytes());
+            } catch (Exception ignored) {
+            }
+        }
+        System.out.println(json);
     }
-
 }
