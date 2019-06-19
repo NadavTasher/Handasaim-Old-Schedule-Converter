@@ -65,7 +65,7 @@ public class Schedule extends JSONObject {
         // Initialize grades
         put(GRADES, parseGrades(sheet));
         // Initialize teachers
-        put(TEACHERS, parseTeachers(getJSONObject(GRADES)));
+        put(TEACHERS, parseTeachers(getJSONArray(GRADES)));
 
     }
 
@@ -201,8 +201,8 @@ public class Schedule extends JSONObject {
         return untrimmed;
     }
 
-    private JSONObject parseGrades(Sheet sheet) {
-        JSONObject grades = new JSONObject();
+    private JSONArray parseGrades(Sheet sheet) {
+        JSONArray grades = new JSONArray();
         // If the cell after day name is empty, first row is 1, else 0
         int firstRow = parseCell(sheet, 1, 0).isEmpty() ? 1 : 0;
         // First column is always after the hour column
@@ -215,6 +215,8 @@ public class Schedule extends JSONObject {
             JSONObject grade = new JSONObject();
             // Parse minimal grade name
             String name = parseCell(sheet, c, firstRow).split(" ")[0];
+            // Put grade name
+            grade.put(NAME, name);
             // Put parsed grade number (7-12)
             grade.put(GRADE, parseGrade(name));
             // Create subjects structure
@@ -246,7 +248,7 @@ public class Schedule extends JSONObject {
             // Put subjects in grade
             grade.put(SUBJECTS, subjects);
             // Put grade in grades
-            grades.put(name, grade);
+            grades.put(grade);
         }
         return grades;
     }
@@ -282,15 +284,15 @@ public class Schedule extends JSONObject {
         return messages;
     }
 
-    private JSONArray parseTeachers(JSONObject grades) {
+    private JSONArray parseTeachers(JSONArray grades) {
         // Initialize teachers array
         JSONArray teachers = new JSONArray();
         // Loop through grades
-        for (String grade : grades.keySet()) {
+        for (Object grade : grades) {
             // Loop through subjects
-            for (String hour : grades.getJSONObject(grade).getJSONObject(SUBJECTS).keySet()) {
+            for (String hour : ((JSONObject) grade).getJSONObject(SUBJECTS).keySet()) {
                 // Loop through teacher name array in parseSubject
-                for (Object name : grades.getJSONObject(grade).getJSONObject(SUBJECTS).getJSONObject(hour).getJSONArray(TEACHERS)) {
+                for (Object name : ((JSONObject) grade).getJSONObject(SUBJECTS).getJSONObject(hour).getJSONArray(TEACHERS)) {
                     // Check type of object
                     if (name instanceof String) {
                         // Initialize flag
@@ -303,9 +305,9 @@ public class Schedule extends JSONObject {
                                 if (((String) name).startsWith(((JSONObject) teacher).getString(NAME)) || ((JSONObject) teacher).getString(NAME).startsWith(((String) name))) {
                                     // Pull subjects object from teacher
                                     JSONObject subjects = ((JSONObject) teacher).getJSONObject(SUBJECTS);
-                                    // Insert parseSubject
-                                    subjects.put(hour, grade);
-                                    // Check if parseSubject's teacher name is longer, and replace.
+                                    // Insert subject
+                                    subjects.put(hour, ((JSONObject) grade).getString(NAME));
+                                    // Check if subject's teacher name is longer, and replace.
                                     if (((String) name).length() > ((JSONObject) teacher).getString(NAME).length()) {
                                         // Replace teacher name
                                         ((JSONObject) teacher).put(NAME, name);
@@ -322,8 +324,8 @@ public class Schedule extends JSONObject {
                             // Create new teacher object and subjects object
                             JSONObject teacher = new JSONObject();
                             JSONObject subjects = new JSONObject();
-                            // Insert parseSubject
-                            subjects.put(hour, grade);
+                            // Insert subject
+                            subjects.put(hour, ((JSONObject) grade).getString(NAME));
                             // Put name
                             teacher.put(NAME, name);
                             // Put subjects object in teacher
