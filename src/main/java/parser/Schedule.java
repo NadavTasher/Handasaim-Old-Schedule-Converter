@@ -6,11 +6,22 @@
 
 package parser;
 
-import okhttp3.*;
-import org.apache.poi.hssf.usermodel.*;
+import okhttp3.ConnectionSpec;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import org.apache.poi.hssf.usermodel.HSSFShape;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFTextbox;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFShape;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFSimpleShape;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
@@ -21,9 +32,12 @@ import org.jsoup.select.Elements;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Schedule extends JSONObject {
+
+    private static boolean SECURITY = true;
 
     private static String SUBJECTS = "subjects";
     private static String MESSAGES = "messages";
@@ -165,13 +179,34 @@ public class Schedule extends JSONObject {
             for (Element element : elements) {
                 // Pull 'href' attribute from 'a' tag
                 String href = element.attr("href");
-                // Check 'href' attribute file format against known excel file types, and verify that it is indeed a schedule Excel (other Excel files might exist on the homepage.).
-                if ((href.endsWith(".xls") || href.endsWith(".xlsx") && Pattern.compile("^(.(|.)-.(|.)\\..+)$").matcher(href).find())) {
-                    // Return 'href' attribute
-                    return href;
+                // Check if the link is hosted on handasaim.co.il and if the link text contains "Download", to prevent people who reply on the page to post fake schedule links.
+                // Initialize "security" boolean
+                boolean security = false;
+                // Run security checks only if SECURITY is enabled
+                if (SECURITY) {
+                    // Extract the host from the link
+                    String host = extractHost(link);
+                    // Perform checks
+                    security = host != null && href.startsWith(host) && element.text().toLowerCase().contains("download");
+                }
+                // Check if security is disabled OR if security checks have been passed
+                if (!SECURITY || security) {
+                    // Check 'href' attribute file format against known excel file types, and verify that it is indeed a schedule Excel (other Excel files might exist on the homepage.).
+                    if ((href.endsWith(".xls") || href.endsWith(".xlsx") && Pattern.compile("^(.(|.)-.(|.)\\..+)$").matcher(href).find())) {
+                        // Return 'href' attribute
+                        return href;
+                    }
                 }
             }
         } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private String extractHost(String link) {
+        Matcher matcher = Pattern.compile("http(|s)://([a-z]|\\.)+").matcher(link);
+        if (matcher.find()) {
+            return matcher.group();
         }
         return null;
     }
