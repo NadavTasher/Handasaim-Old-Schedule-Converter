@@ -67,7 +67,7 @@ public class Schedule extends JSONObject {
             {"מעבדה", "מע'"}
     };
 
-    public Schedule(String page) {
+    public Schedule(String page) throws Exception {
         // Initialize sheet
         Sheet sheet = initializeSheet(page);
         // Check if sheet is null
@@ -117,57 +117,55 @@ public class Schedule extends JSONObject {
         return 0;
     }
 
-    private Sheet initializeSheet(String page) {
+    private Sheet initializeSheet(String page) throws Exception {
         // Fetch link from page
         String link = initializeLink(page);
         // Verify that a link has been found
         if (link != null) {
-            try {
-                // Connect to Excel file
-                OkHttpClient client = null;
-                // Check for connection protocol
-                if (link.startsWith("https")) {
-                    // Create a client for HTTPS SSL enabled requests
-                    client = new OkHttpClient.Builder().connectionSpecs(Collections.singletonList(ConnectionSpec.MODERN_TLS)).build();
-                } else {
-                    // Create a client for standard HTTP requests
-                    client = new OkHttpClient();
+            // Connect to Excel file
+            OkHttpClient client = null;
+            // Check for connection protocol
+            if (link.startsWith("https")) {
+                // Create a client for HTTPS SSL enabled requests
+                client = new OkHttpClient.Builder().connectionSpecs(Collections.singletonList(ConnectionSpec.MODERN_TLS)).build();
+            } else {
+                // Create a client for standard HTTP requests
+                client = new OkHttpClient();
+            }
+            // Fetch file from link
+            Response response = client.newCall(new Request.Builder().url(link).get().build()).execute();
+            // Extract InputStream from response
+            InputStream stream = response.body() != null ? response.body().byteStream() : null;
+            // Verify stream integrity... kinda
+            if (stream != null) {
+                Workbook workbook = null;
+                // Create a workbook of right type by examining file type
+                if (link.endsWith(".xls")) {
+                    workbook = new HSSFWorkbook(new POIFSFileSystem(stream));
+                } else if (link.endsWith(".xlsx")) {
+                    workbook = new XSSFWorkbook(stream);
                 }
-                // Fetch file from link
-                Response response = client.newCall(new Request.Builder().url(link).get().build()).execute();
-                // Extract InputStream from response
-                InputStream stream = response.body() != null ? response.body().byteStream() : null;
-                // Verify stream integrity... kinda
-                if (stream != null) {
-                    Workbook workbook = null;
-                    // Create a workbook of right type by examining file type
-                    if (link.endsWith(".xls")) {
-                        workbook = new HSSFWorkbook(new POIFSFileSystem(stream));
-                    } else if (link.endsWith(".xlsx")) {
-                        workbook = new XSSFWorkbook(stream);
-                    }
-                    // Verify that the file was actually an Excel file, won't proceed if type detected isn't supported
-                    if (workbook != null) {
-                        // Loop through sheets
-                        for (int s = 0; s < workbook.getNumberOfSheets(); s++) {
-                            Sheet current = workbook.getSheetAt(s);
-                            // Check for minimum rows
-                            if (current.getLastRowNum() > 1) {
-                                // Return sheet
-                                return current;
-                            }
+                // Verify that the file was actually an Excel file, won't proceed if type detected isn't supported
+                if (workbook != null) {
+                    // Loop through sheets
+                    for (int s = 0; s < workbook.getNumberOfSheets(); s++) {
+                        Sheet current = workbook.getSheetAt(s);
+                        // Check for minimum rows
+                        if (current.getLastRowNum() > 1) {
+                            // Return sheet
+                            return current;
                         }
                     }
-                } else {
-                    error("Null Excel response body");
                 }
-            } catch (Exception ignored) {
+            } else {
+                error("Null Excel response body");
+                throw new Exception("Null Excel response body");
             }
             return null;
         } else {
             error("Schedule link not found");
+            throw new Exception("Schedule link not found");
         }
-        return null;
     }
 
     private String initializeLink(String link) {
