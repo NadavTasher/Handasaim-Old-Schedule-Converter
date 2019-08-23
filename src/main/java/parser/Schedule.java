@@ -68,19 +68,21 @@ public class Schedule extends JSONObject {
     };
 
     public Schedule(String page) {
-        // Add ringing times
-        put(SCHEDULE, new int[]{465, 510, 555, 615, 660, 730, 775, 830, 875, 930, 975, 1020, 1065});
         // Initialize sheet
         Sheet sheet = initializeSheet(page);
-        // Initialize messages
-        put(MESSAGES, parseMessages(sheet));
-        // Initialize day
-        put(DAY, parseDay(sheet));
-        // Initialize grades
-        put(GRADES, parseGrades(sheet));
-        // Initialize teachers
-        put(TEACHERS, parseTeachers(getJSONArray(GRADES)));
-
+        // Check if sheet is null
+        if (sheet != null) {
+            // Initialize messages
+            put(MESSAGES, parseMessages(sheet));
+            // Initialize day
+            put(DAY, parseDay(sheet));
+            // Initialize grades
+            put(GRADES, parseGrades(sheet));
+            // Initialize teachers
+            put(TEACHERS, parseTeachers(getJSONArray(GRADES)));
+            // Add ringing times
+            put(SCHEDULE, new int[]{465, 510, 555, 615, 660, 730, 775, 830, 875, 930, 975, 1020, 1065});
+        }
     }
 
     private void error(String error) {
