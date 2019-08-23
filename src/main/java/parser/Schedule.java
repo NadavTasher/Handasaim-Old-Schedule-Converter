@@ -37,17 +37,17 @@ import java.util.regex.Pattern;
 
 public class Schedule extends JSONObject {
 
-    private static boolean SECURITY = true;
+    static final boolean SECURITY = true;
 
-    private static String SUBJECTS = "subjects";
-    private static String MESSAGES = "messages";
-    private static String TEACHERS = "teachers";
-    private static String SCHEDULE = "schedule";
-    private static String ERRORS = "errors";
-    private static String GRADES = "grades";
-    private static String GRADE = "grade";
-    private static String NAME = "name";
-    private static String DAY = "day";
+    public static final String SUBJECTS = "subjects";
+    public static final String MESSAGES = "messages";
+    public static final String TEACHERS = "teachers";
+    public static final String SCHEDULE = "schedule";
+    public static final String ERRORS = "errors";
+    public static final String GRADES = "grades";
+    public static final String GRADE = "grade";
+    public static final String NAME = "name";
+    public static final String DAY = "day";
 
     private static String[] DAYS = {
             "ראשון",

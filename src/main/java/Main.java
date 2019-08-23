@@ -12,15 +12,17 @@ import java.nio.file.Files;
 
 public class Main {
     public static void main(String[] arguments) {
-        String json = new JSONObject().toString();
+        JSONObject json = new JSONObject();
         try {
             if (arguments.length >= 1) {
-                json = new Schedule(arguments[0]).toString();
+                json = new Schedule(arguments[0]);
             }
-            if (arguments.length >= 2) {
-                try {
-                    Files.write(new File(arguments[1]).toPath(), json.getBytes());
-                } catch (Exception ignored) {
+            if(json.getJSONArray(Schedule.ERRORS).length() == 0) {
+                if (arguments.length >= 2) {
+                    try {
+                        Files.write(new File(arguments[1]).toPath(), json.getBytes());
+                    } catch (Exception ignored) {
+                    }
                 }
             }
         } catch (Exception e) {
