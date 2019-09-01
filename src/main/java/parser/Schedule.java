@@ -187,8 +187,10 @@ public class Schedule extends JSONObject {
         try {
             // Connect to page, 7.5 second timeout.
             Document document = Jsoup.connect(link).timeout(7500).get();
+            // Find the 'elementor-widget-theme-post-content' element
+            Element holder = document.selectFirst("div.elementor-widget-theme-post-content");
             // Look for 'a' tags
-            Elements elements = document.select("a");
+            Elements elements = holder.select("a");
             // Loop on 'a' tags
             for (Element element : elements) {
                 // Pull 'href' attribute from 'a' tag
@@ -201,7 +203,7 @@ public class Schedule extends JSONObject {
                     // Extract the host from the link
                     String host = extractHost(link);
                     // Perform checks
-                    security = host != null && href.startsWith(host) && element.text().toLowerCase().contains("download");
+                    security = host != null && href.startsWith(host);
                 }
                 // Check if security is disabled OR if security checks have been passed
                 if (!SECURITY || security) {
